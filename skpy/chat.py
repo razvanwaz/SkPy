@@ -2,7 +2,7 @@ from datetime import datetime
 import re
 import time
 
-from .core import SkypeObj, SkypeObjs
+from .core import SkypeObj, SkypeObjs, SkypeApiException
 from .util import SkypeUtils
 from .conn import SkypeConnection
 from .msg import SkypeMsg
@@ -412,10 +412,14 @@ class SkypeChats(SkypeObjs):
         for json in resp.get("conversations", []):
             cls = SkypeSingleChat
             if "threadProperties" in json:
-                info = self.skype.conn("GET", "{0}/threads/{1}".format(self.skype.conn.msgsHost, json.get("id")),
-                                       auth=SkypeConnection.Auth.RegToken,
-                                       params={"view": "msnp24Equivalent"}).json()
-                json.update(info)
+                try:
+                    info = self.skype.conn("GET", "{0}/threads/{1}".format(self.skype.conn.msgsHost, json.get("id")),
+                                           auth=SkypeConnection.Auth.RegToken,
+                                           params={"view": "msnp24Equivalent"}).json()
+                    json.update(info)
+                except SkypeApiException as e:
+                    if e.args[1].status_code != 403:
+                        raise e
                 cls = SkypeGroupChat
             chats[json.get("id")] = self.merge(cls.fromRaw(self.skype, json))
         return chats
